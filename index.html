@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Camera Capture & PUT Upload</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f9fafb;
+      margin: 0; padding: 20px;
+      display: flex; flex-direction: column; align-items: center;
+      min-height: 100vh; color: #222;
+    }
+    h1 {
+      margin-bottom: 20px;
+    }
+    video, img {
+      border-radius: 8px;
+      max-width: 100%;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    video {
+      width: 320px;
+      height: 240px;
+      background: #000;
+    }
+    img {
+      margin-top: 15px;
+      width: 320px;
+      height: auto;
+      border: 2px solid #4CAF50;
+    }
+    button {
+      margin-top: 15px;
+      padding: 10px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 6px;
+      background-color: #4caf50;
+      color: white;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    button:disabled {
+      background-color: #9e9e9e;
+      cursor: not-allowed;
+    }
+    button:hover:not(:disabled) {
+      background-color: #45a049;
+    }
+    #status {
+      margin-top: 20px;
+      font-weight: 600;
+      min-height: 24px;
+      color: #444;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Camera Capture & Upload (PUT)</h1>
+
+  <video id="video" autoplay playsinline></video>
+  <canvas id="canvas" style="display:none;"></canvas>
+
+  <button id="captureBtn">Capture Photo</button>
+  <button id="uploadBtn" disabled>Upload Photo</button>
+
+  <img id="photo" alt="Captured photo will appear here" style="display:none;" />
+
+  <div id="status"></div>
+
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const photo = document.getElementById('photo');
+    const captureBtn = document.getElementById('captureBtn');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const status = document.getElementById('status');
+
+    // Your API Gateway PUT endpoint here (replace with your actual URL)
+    const API_GATEWAY_UPLOAD_URL = "https://xtsui1xq85.execute-api.us-east-1.amazonaws.com/dev/newnlblogs/aadianil.jpeg";
+
+    // Start the camera
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+      } catch (err) {
+        alert("Error accessing camera: " + err.message);
+        status.textContent = "Camera access denied or unavailable.";
+      }
+    }
+
+    // Capture photo from video stream
+    function capturePhoto() {
+      const width = video.videoWidth;
+      const height = video.videoHeight;
+
+      if (!width || !height) {
+        alert("Video not ready. Please try again.");
+        return;
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, width, height);
+
+      const dataUrl = canvas.toDataURL('image/png');
+      photo.src = dataUrl;
+      photo.style.display = 'block';
+
+      uploadBtn.disabled = false;
+      status.textContent = "Photo captured. Ready to upload.";
+    }
+
+    // Convert dataURL to Blob (raw binary)
+    function dataURLtoBlob(dataurl) {
+      const arr = dataurl.split(',');
+      const mime = arr[0].match(/:(.*?);/)[1];
+      const bstr = atob(arr[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+      return new Blob([u8arr], { type: mime });
+    }
+
+    // Upload photo via PUT request
+    async function uploadPhoto() {
+      if (!photo.src) {
+        alert("No photo to upload!");
+        return;
+      }
+
+      status.textContent = "Uploading...";
+      uploadBtn.disabled = true;
+      captureBtn.disabled = true;
+
+      const blob = dataURLtoBlob(photo.src);
+
+      try {
+        const response = await fetch(API_GATEWAY_UPLOAD_URL, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'image/png',
+          },
+          body: blob,
+        });
+
+        if (response.ok) {
+          status.textContent = "Upload successful!";
+        } else {
+          const errorText = await response.text();
+          status.textContent = "Upload failed: " + errorText;
+        }
+      } catch (err) {
+        status.textContent = "Upload error: " + err.message;
+      } finally {
+        uploadBtn.disabled = false;
+        captureBtn.disabled = false;
+      }
+    }
+
+    // Event listeners
+    captureBtn.addEventListener('click', capturePhoto);
+    uploadBtn.addEventListener('click', uploadPhoto);
+
+    // Initialize camera on page load
+    startCamera();
+  </script>
+
+</body>
+</html>
